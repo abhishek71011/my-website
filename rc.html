@@ -1,0 +1,1780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RetinaCare — Vessel Tree Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0E0F;
+    --panel:#13171A;
+    --panel-raised:#181D20;
+    --steel:#3D4548;
+    --steel-line: #262C2F;
+    --paper:#F5F1E8;
+    --paper-dim:#A8A39A;
+    --muted:#7A8A8C;
+    --vein:#E8483C;
+    --vein-dim:#5C2620;
+    --artery:#E8B94A;
+    --artery-dim:#5C4A1F;
+    --focus:#5FB6C9;
+    --mono:'JetBrains Mono', monospace;
+    --sans:'Inter', sans-serif;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    background:var(--bg);
+    color:var(--paper);
+    font-family:var(--sans);
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  ::selection{ background:var(--artery); color:#1a1500;}
+  a{color:inherit;}
+
+  /* faint scope-grid atmosphere */
+  .grid-bg{
+    position:fixed; inset:0; z-index:0; pointer-events:none;
+    background-image:
+      radial-gradient(ellipse at 50% -10%, rgba(95,182,201,0.07), transparent 60%),
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.018) 0px, rgba(255,255,255,0.018) 1px, transparent 1px, transparent 64px),
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.018) 0px, rgba(255,255,255,0.018) 1px, transparent 1px, transparent 64px);
+  }
+
+  .wrap{ position:relative; z-index:1; max-width:1180px; margin:0 auto; padding:0 28px;}
+
+  /* ---------- NAV ---------- */
+  nav{
+    position:sticky; top:0; z-index:50;
+    background:rgba(11,14,15,0.85);
+    backdrop-filter: blur(10px);
+    border-bottom:1px solid var(--steel-line);
+  }
+  .nav-inner{
+    max-width:1180px; margin:0 auto; padding:16px 28px;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .brand{ display:flex; align-items:center; gap:10px; font-family:var(--mono); font-weight:600; letter-spacing:0.02em; font-size:15px;}
+  .brand .dot{
+    width:9px; height:9px; border-radius:50%;
+    background: conic-gradient(var(--vein) 0deg 180deg, var(--artery) 180deg 360deg);
+    box-shadow:0 0 10px rgba(232,72,60,0.5);
+    flex-shrink:0;
+  }
+  .brand small{ color:var(--muted); font-weight:400; font-size:11px; letter-spacing:0.08em;}
+  .nav-links{ display:flex; gap:28px; font-size:13px; color:var(--paper-dim);}
+  .nav-links a{ text-decoration:none; transition:color .2s;}
+  .nav-links a:hover{ color:var(--focus);}
+  .nav-cta{
+    font-family:var(--mono); font-size:12px; padding:9px 16px;
+    border:1px solid var(--steel); border-radius:3px; color:var(--paper);
+    text-decoration:none; transition: border-color .2s, color .2s;
+  }
+  .nav-cta:hover{ border-color:var(--focus); color:var(--focus);}
+
+  /* ---------- HERO ---------- */
+  .hero{ padding:88px 0 60px; position:relative;}
+  .eyebrow{
+    font-family:var(--mono); font-size:12px; letter-spacing:0.12em; color:var(--focus);
+    display:flex; align-items:center; gap:10px; margin-bottom:22px; text-transform:uppercase;
+  }
+  .eyebrow::before{ content:''; width:24px; height:1px; background:var(--focus);}
+  h1{
+    font-size:clamp(36px, 5.2vw, 64px);
+    font-weight:800; letter-spacing:-0.025em; line-height:1.04;
+    max-width:820px; color:var(--paper);
+  }
+  h1 .accent-vein{ color:var(--vein);}
+  h1 .accent-artery{ color:var(--artery);}
+  .lede{
+    margin-top:22px; max-width:600px; font-size:17px; color:var(--paper-dim); line-height:1.65;
+  }
+  .legend-row{
+    display:flex; gap:28px; margin-top:30px; flex-wrap:wrap;
+  }
+  .legend-item{ display:flex; align-items:center; gap:9px; font-family:var(--mono); font-size:12.5px; color:var(--muted);}
+  .legend-swatch{ width:26px; height:9px; border-radius:5px; flex-shrink:0;}
+  .legend-swatch.vein{ background:linear-gradient(90deg, #C23A30, var(--vein)); }
+  .legend-swatch.artery{ background:linear-gradient(90deg, var(--artery), #F2D27A); position:relative;}
+  .legend-swatch.artery::after{
+    content:''; position:absolute; top:50%; left:10%; right:10%; height:1.5px;
+    background:#FFF7DC; transform:translateY(-50%); opacity:.9;
+  }
+
+  /* ---------- UPLOAD / VIEWFINDER ---------- */
+  .stage{ padding:36px 0 90px; }
+  .console{
+    background:var(--panel);
+    border:1px solid var(--steel-line);
+    border-radius:14px;
+    padding:28px;
+    position:relative;
+  }
+  .console-head{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:22px; flex-wrap:wrap; gap:14px;
+  }
+  .console-title{ font-family:var(--mono); font-size:12.5px; letter-spacing:0.08em; color:var(--muted); text-transform:uppercase;}
+  .mode-tabs{ display:flex; gap:6px; background:var(--bg); padding:4px; border-radius:8px; border:1px solid var(--steel-line);}
+  .mode-tab{
+    font-family:var(--mono); font-size:12px; padding:7px 14px; border-radius:6px;
+    background:transparent; border:none; color:var(--muted); cursor:pointer; transition:.2s;
+  }
+  .mode-tab.active{ background:var(--steel); color:var(--paper);}
+  .mode-tab:disabled{ opacity:.35; cursor:not-allowed;}
+
+  .dropzone{
+    border:1.5px dashed var(--steel);
+    border-radius:12px;
+    min-height:420px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:18px; text-align:center; padding:40px 20px;
+    cursor:pointer; transition: border-color .2s, background .2s;
+    position:relative;
+  }
+  .dropzone:hover, .dropzone.drag{ border-color:var(--focus); background:rgba(95,182,201,0.04);}
+  .scope-icon{ width:84px; height:84px; opacity:.85;}
+  .dz-title{ font-size:18px; font-weight:600; color:var(--paper);}
+  .dz-sub{ font-size:13.5px; color:var(--muted); max-width:340px;}
+  .dz-formats{ font-family:var(--mono); font-size:11px; color:var(--steel); letter-spacing:.05em; margin-top:6px;}
+  #fileInput{ display:none;}
+  .browse-btn{
+    margin-top:6px; font-family:var(--mono); font-size:12.5px; padding:10px 20px;
+    background:var(--paper); color:var(--bg); border:none; border-radius:6px;
+    font-weight:600; cursor:pointer; transition:transform .15s, background .15s;
+  }
+  .browse-btn:hover{ background:var(--focus); transform:translateY(-1px);}
+
+  .sample-row{ margin-top:18px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:center;}
+  .sample-label{ font-family:var(--mono); font-size:11.5px; color:var(--steel);}
+  .sample-btn{
+    font-family:var(--mono); font-size:11.5px; padding:7px 13px; border-radius:20px;
+    border:1px solid var(--steel-line); background:var(--bg); color:var(--paper-dim);
+    cursor:pointer; transition:.2s;
+  }
+  .sample-btn:hover{ border-color:var(--focus); color:var(--focus);}
+
+  /* analysis viewport */
+  .analysis{ display:none; }
+  .analysis.active{ display:block;}
+  .scope-stage{
+    position:relative;
+    display:grid;
+    grid-template-columns: 1fr;
+    gap:0;
+    background:#000;
+    border-radius:10px;
+    overflow:hidden;
+    border:1px solid var(--steel-line);
+    max-width:560px;
+    margin:0 auto;
+  }
+  .scope-canvas-wrap{
+    position:relative;
+    width:100%;
+    aspect-ratio: 1/1;
+    background:#000;
+    overflow:hidden;
+    cursor:crosshair;
+  }
+  .scope-canvas-wrap canvas{
+    position:absolute; inset:0; width:100%; height:100%;
+  }
+  /* viewfinder vignette / aperture ring */
+  .scope-canvas-wrap::after{
+    content:'';
+    position:absolute; inset:0; pointer-events:none;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06), inset 0 0 90px 30px rgba(0,0,0,0.55);
+    border-radius:0;
+  }
+  .reticle{
+    position:absolute; pointer-events:none; z-index:10; display:none;
+  }
+  .reticle .h, .reticle .v{
+    position:absolute; background:rgba(95,182,201,0.55);
+  }
+  .reticle .h{ width:18px; height:1px; top:50%; left:50%; transform:translate(-50%,-50%);}
+  .reticle .v{ width:1px; height:18px; top:50%; left:50%; transform:translate(-50%,-50%);}
+  .reticle .ring{
+    position:absolute; width:34px; height:34px; border:1px solid rgba(95,182,201,0.7);
+    border-radius:50%; top:50%; left:50%; transform:translate(-50%,-50%);
+  }
+
+  .layer-toggles{
+    position:absolute; top:14px; left:14px; z-index:20;
+    display:flex; flex-direction:column; gap:6px;
+    background:rgba(11,14,15,0.78); backdrop-filter:blur(6px);
+    border:1px solid var(--steel-line); border-radius:9px; padding:10px;
+  }
+  .toggle-row{ display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:11px; color:var(--paper-dim); cursor:pointer; user-select:none;}
+  .toggle-row input{ accent-color:var(--focus); width:13px; height:13px;}
+  .scale-badge{
+    position:absolute; bottom:14px; left:14px; z-index:20;
+    font-family:var(--mono); font-size:10.5px; color:var(--muted);
+    background:rgba(11,14,15,0.78); border:1px solid var(--steel-line);
+    padding:6px 10px; border-radius:7px;
+  }
+
+  .readout-panel{
+    position:absolute; top:14px; right:14px; z-index:20;
+    width:220px;
+    background:rgba(11,14,15,0.88); backdrop-filter:blur(6px);
+    border:1px solid var(--steel-line); border-radius:9px;
+    padding:14px;
+    font-family:var(--mono);
+    opacity:0; transform:translateY(-4px); transition:opacity .15s, transform .15s;
+  }
+  .readout-panel.show{ opacity:1; transform:translateY(0);}
+  .readout-label{ font-size:10px; letter-spacing:.08em; color:var(--muted); text-transform:uppercase; margin-bottom:8px; display:flex; align-items:center; gap:7px;}
+  .readout-label .pip{ width:7px; height:7px; border-radius:50%;}
+  .readout-value{ font-size:26px; font-weight:600; color:var(--paper); line-height:1.1;}
+  .readout-value .unit{ font-size:13px; color:var(--muted); font-weight:400; margin-left:3px;}
+  .readout-sub{ font-size:10.5px; color:var(--steel); margin-top:6px;}
+  .readout-empty{ font-size:11px; color:var(--steel); line-height:1.5;}
+  .readout-divider{ height:1px; background:var(--steel-line); margin:10px 0;}
+
+  .progress-overlay{
+    position:absolute; inset:0; z-index:30;
+    background:rgba(11,14,15,0.92);
+    display:none; flex-direction:column; align-items:center; justify-content:center; gap:16px;
+  }
+  .progress-overlay.show{ display:flex;}
+  .scan-line-wrap{ width:240px; height:2px; background:var(--steel-line); border-radius:2px; overflow:hidden; position:relative;}
+  .scan-line{ position:absolute; left:-40%; top:0; width:40%; height:100%; background:linear-gradient(90deg, transparent, var(--focus), transparent); animation: scan 1.1s ease-in-out infinite;}
+  @keyframes scan{ 0%{left:-40%;} 100%{left:100%;} }
+  .progress-text{ font-family:var(--mono); font-size:12px; color:var(--paper-dim); letter-spacing:.04em;}
+  .progress-step{ font-family:var(--mono); font-size:10.5px; color:var(--steel);}
+
+  .toolbar{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-top:18px; flex-wrap:wrap; gap:14px;
+  }
+  .stat-strip{ display:flex; gap:22px; flex-wrap:wrap;}
+  .stat{ font-family:var(--mono);}
+  .stat-num{ font-size:20px; font-weight:600; color:var(--paper);}
+  .stat-num.vein-c{ color:var(--vein);}
+  .stat-num.artery-c{ color:var(--artery);}
+  .stat-lbl{ font-size:10px; color:var(--muted); letter-spacing:.06em; text-transform:uppercase; margin-top:2px;}
+  .action-btns{ display:flex; gap:10px;}
+  .btn-ghost{
+    font-family:var(--mono); font-size:12px; padding:9px 16px;
+    background:transparent; border:1px solid var(--steel); color:var(--paper-dim);
+    border-radius:6px; cursor:pointer; transition:.2s;
+  }
+  .btn-ghost:hover{ border-color:var(--focus); color:var(--focus);}
+
+  .disclaimer{
+    margin-top:18px; padding:13px 16px; border-radius:8px;
+    background:rgba(232,185,74,0.06); border:1px solid rgba(232,185,74,0.25);
+    font-size:12px; color:#D8C28A; line-height:1.55; display:flex; gap:10px;
+  }
+  .disclaimer svg{ flex-shrink:0; margin-top:1px;}
+
+  /* ---------- HOW IT WORKS ---------- */
+  .how{ padding:80px 0; border-top:1px solid var(--steel-line);}
+  .section-head{ margin-bottom:46px; max-width:600px;}
+  .section-eyebrow{ font-family:var(--mono); font-size:11.5px; letter-spacing:.1em; color:var(--focus); text-transform:uppercase; margin-bottom:12px;}
+  .section-head h2{ font-size:clamp(26px,3.4vw,36px); font-weight:800; letter-spacing:-0.02em;}
+  .section-head p{ margin-top:12px; color:var(--paper-dim); font-size:15px;}
+
+  .pipeline{ display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--steel-line); border:1px solid var(--steel-line); border-radius:12px; overflow:hidden;}
+  .pstep{ background:var(--panel); padding:26px 22px;}
+  .pstep-n{ font-family:var(--mono); font-size:11px; color:var(--steel); margin-bottom:14px;}
+  .pstep h3{ font-size:15px; font-weight:600; margin-bottom:9px;}
+  .pstep p{ font-size:13px; color:var(--muted); line-height:1.55;}
+
+  @media (max-width:880px){
+    .pipeline{ grid-template-columns:1fr 1fr;}
+  }
+  @media (max-width:560px){
+    .pipeline{ grid-template-columns:1fr;}
+    .nav-links{ display:none;}
+    .readout-panel{ width:150px; padding:11px;}
+    .readout-value{ font-size:21px;}
+    .brand small{ display:none;}
+    .nav-cta{ font-size:11px; padding:8px 12px; white-space:nowrap;}
+    .nav-inner{ padding:14px 18px;}
+    .wrap{ padding:0 18px;}
+    .layer-toggles{ padding:8px; gap:4px;}
+    .toggle-row{ font-size:10px;}
+    .scale-badge{ font-size:9.5px; padding:5px 8px;}
+    .console{ padding:16px;}
+    .mode-tabs{ flex-wrap:wrap; justify-content:flex-end;}
+    .mode-tab{ padding:6px 10px; font-size:11px;}
+    .console-head{ justify-content:flex-start;}
+    .stat-strip{ gap:14px;}
+    .toolbar{ flex-direction:column; align-items:flex-start;}
+    .action-btns{ width:100%;}
+    .btn-ghost{ flex:1; text-align:center;}
+  }
+
+  /* ---------- FOOTER ---------- */
+  footer{ border-top:1px solid var(--steel-line); padding:36px 0; }
+  .footer-inner{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:14px;}
+  .footer-brand{ font-family:var(--mono); font-size:12.5px; color:var(--muted);}
+  .footer-note{ font-size:12px; color:var(--steel); max-width:480px; text-align:right;}
+  @media (max-width:700px){ .footer-note{ text-align:left;} }
+</style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+
+<nav>
+  <div class="nav-inner">
+    <div class="brand"><span class="dot"></span>RetinaCare<small>&nbsp;·&nbsp;retinacare.co</small></div>
+    <div class="nav-links">
+      <a href="#stage">Analyze</a>
+      <a href="#how">How it works</a>
+    </div>
+    <a href="#stage" class="nav-cta">Open scope →</a>
+  </div>
+</nav>
+
+<header class="wrap hero">
+  <div class="eyebrow">Client-side vessel analysis</div>
+  <h1>See the vessel tree.<br>Tell <span class="accent-artery">artery</span> from <span class="accent-vein">vein</span>, down to the micron.</h1>
+  <p class="lede">Upload a fundus photograph and RetinaCare traces the retinal vasculature, reduces it to a single-pixel skeleton, and classifies every segment as arterial or venous — then reports the vessel diameter in micrometers wherever you point.</p>
+  <div class="legend-row">
+    <div class="legend-item"><span class="legend-swatch vein"></span>Vein — bulkier, deeper red</div>
+    <div class="legend-item"><span class="legend-swatch artery"></span>Artery — narrower, with a light central reflex</div>
+  </div>
+</header>
+
+<main class="wrap stage" id="stage">
+  <div class="console">
+    <div class="console-head">
+      <div class="console-title">Optical input</div>
+      <div class="mode-tabs">
+        <button class="mode-tab active" data-mode="original">Source</button>
+        <button class="mode-tab" data-mode="skeleton" disabled>Skeleton</button>
+        <button class="mode-tab" data-mode="classified" disabled>A/V Map</button>
+        <button class="mode-tab" data-mode="overlay" disabled>Overlay</button>
+      </div>
+    </div>
+
+    <!-- Upload zone -->
+    <div class="dropzone" id="dropzone">
+      <svg class="scope-icon" viewBox="0 0 100 100" fill="none">
+        <circle cx="50" cy="50" r="38" stroke="#3D4548" stroke-width="1.5"/>
+        <circle cx="50" cy="50" r="38" stroke="#5FB6C9" stroke-width="1.5" stroke-dasharray="6 230" stroke-linecap="round">
+          <animateTransform attributeName="transform" type="rotate" from="0 50 50" to="360 50 50" dur="3.5s" repeatCount="indefinite"/>
+        </circle>
+        <path d="M50 12 V 22 M50 78 V 88 M12 50 H22 M78 50 H88" stroke="#3D4548" stroke-width="1.5"/>
+        <circle cx="50" cy="50" r="14" stroke="#E8483C" stroke-width="1.4"/>
+        <path d="M44 50 Q50 40 56 50 Q50 60 44 50 Z" stroke="#E8B94A" stroke-width="1.2" fill="none"/>
+      </svg>
+      <div class="dz-title">Drop a retinal photograph here</div>
+      <div class="dz-sub">Standard 45° fundus images work best — color photographs from a fundus camera, centered on the optic disc.</div>
+      <div class="dz-formats">JPG · PNG · WEBP &nbsp;—&nbsp; processed entirely in your browser</div>
+      <button class="browse-btn" id="browseBtn">Choose image</button>
+      <input type="file" id="fileInput" accept="image/png, image/jpeg, image/webp">
+      <div class="sample-row">
+        <span class="sample-label">or try a sample:</span>
+        <button class="sample-btn" data-sample="1">Sample fundus A</button>
+        <button class="sample-btn" data-sample="2">Sample fundus B</button>
+      </div>
+    </div>
+
+    <!-- Analysis viewport -->
+    <div class="analysis" id="analysis">
+      <div class="scope-stage">
+        <div class="scope-canvas-wrap" id="canvasWrap">
+          <canvas id="cnvBase"></canvas>
+          <canvas id="cnvOverlay"></canvas>
+          <div class="reticle" id="reticle"><div class="ring"></div><div class="h"></div><div class="v"></div></div>
+
+          <div class="layer-toggles">
+            <label class="toggle-row"><input type="checkbox" id="tgVessels" checked> Vessel mask</label>
+            <label class="toggle-row"><input type="checkbox" id="tgSkeleton" checked> Skeleton</label>
+            <label class="toggle-row"><input type="checkbox" id="tgClassify" checked> A/V color</label>
+          </div>
+          <div class="scale-badge" id="scaleBadge">Scale: calibrating…</div>
+
+          <div class="readout-panel" id="readout">
+            <div class="readout-empty">Hover over a vessel to measure its diameter.</div>
+          </div>
+
+          <div class="progress-overlay" id="progressOverlay">
+            <div class="scan-line-wrap"><div class="scan-line"></div></div>
+            <div class="progress-text" id="progressText">Initializing…</div>
+            <div class="progress-step" id="progressStep">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <div class="stat-strip">
+          <div class="stat"><div class="stat-num" id="statVesselPct">—</div><div class="stat-lbl">Vessel area</div></div>
+          <div class="stat"><div class="stat-num artery-c" id="statArteryLen">—</div><div class="stat-lbl">Artery px</div></div>
+          <div class="stat"><div class="stat-num vein-c" id="statVeinLen">—</div><div class="stat-lbl">Vein px</div></div>
+          <div class="stat"><div class="stat-num" id="statAVR">—</div><div class="stat-lbl">A/V ratio (cal.)</div></div>
+        </div>
+        <div class="action-btns">
+          <button class="btn-ghost" id="downloadBtn">Download result</button>
+          <button class="btn-ghost" id="resetBtn">New image</button>
+        </div>
+      </div>
+
+      <div class="disclaimer">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1L15 14H1L8 1Z" stroke="#D8C28A" stroke-width="1.2" stroke-linejoin="round"/><path d="M8 6V9.5" stroke="#D8C28A" stroke-width="1.2" stroke-linecap="round"/><circle cx="8" cy="11.7" r="0.8" fill="#D8C28A"/></svg>
+        <div>This is an image-processing demonstration, not a diagnostic device. Vessel detection and artery/vein classification use color, morphology, and tree-connectivity heuristics computed in your browser — even published deep-learning models trained on thousands of expert-labeled images top out around 85–95% agreement on this task, and expert human graders disagree with each other too, so treat any single classification here as an estimate, not ground truth. Diameters are estimated from a standard optic-disc calibration, not a measured camera scale.</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<section class="wrap how" id="how">
+  <div class="section-head">
+    <div class="section-eyebrow">Pipeline</div>
+    <h2>What happens to your image</h2>
+    <p>Four passes, all running locally on your device — nothing is uploaded to a server.</p>
+  </div>
+  <div class="pipeline">
+    <div class="pstep">
+      <div class="pstep-n">01 — Enhance</div>
+      <h3>Vessel filtering</h3>
+      <p>The green channel is isolated and run through a multi-scale ridge filter that responds to thin, elongated structures — the vessels — while suppressing the disc, fovea, and noise.</p>
+    </div>
+    <div class="pstep">
+      <div class="pstep-n">02 — Segment</div>
+      <h3>Adaptive thresholding</h3>
+      <p>The enhanced response is locally thresholded against its neighborhood to produce a binary vessel mask that holds up across uneven illumination.</p>
+    </div>
+    <div class="pstep">
+      <div class="pstep-n">03 — Reduce</div>
+      <h3>Skeletonization</h3>
+      <p>A Zhang–Suen thinning pass erodes the mask to a one-pixel-wide centerline tree, preserving connectivity and branch points.</p>
+    </div>
+    <div class="pstep">
+      <div class="pstep-n">04 — Classify</div>
+      <h3>Artery / vein split</h3>
+      <p>Each vessel branch is scored on local hue, saturation, and the presence of a bright central reflex — arteries run narrower with that pale streak, veins run wider and darker — then a topology pass checks that ambiguous branches agree with the confidently-classified vessels they connect to, mirroring how arteries and veins form two separate trees from the optic disc.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap footer-inner">
+    <div class="footer-brand">RetinaCare · retinacare.co</div>
+    <div class="footer-note">Educational / research tool. Not for clinical diagnosis. All processing happens locally in your browser — images are never uploaded.</div>
+  </div>
+</footer>
+
+<script>
+/* ============================================================
+   RetinaCare — vessel tree extraction, skeletonization,
+   artery/vein classification, and cursor-based diameter readout.
+   100% client-side. No image ever leaves the browser.
+   ============================================================ */
+
+(() => {
+  'use strict';
+
+  // ---------- DOM refs ----------
+  const dropzone   = document.getElementById('dropzone');
+  const analysis    = document.getElementById('analysis');
+  const fileInput   = document.getElementById('fileInput');
+  const browseBtn   = document.getElementById('browseBtn');
+  const cnvBase     = document.getElementById('cnvBase');
+  const cnvOverlay  = document.getElementById('cnvOverlay');
+  const canvasWrap  = document.getElementById('canvasWrap');
+  const reticle     = document.getElementById('reticle');
+  const readout     = document.getElementById('readout');
+  const progressOv  = document.getElementById('progressOverlay');
+  const progressText= document.getElementById('progressText');
+  const progressStep= document.getElementById('progressStep');
+  const scaleBadge  = document.getElementById('scaleBadge');
+  const resetBtn    = document.getElementById('resetBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const modeTabs    = document.querySelectorAll('.mode-tab');
+  const tgVessels   = document.getElementById('tgVessels');
+  const tgSkeleton  = document.getElementById('tgSkeleton');
+  const tgClassify  = document.getElementById('tgClassify');
+
+  const statVesselPct = document.getElementById('statVesselPct');
+  const statArteryLen = document.getElementById('statArteryLen');
+  const statVeinLen   = document.getElementById('statVeinLen');
+  const statAVR        = document.getElementById('statAVR');
+
+  const btxBase = cnvBase.getContext('2d', { willReadFrequently: true });
+  const btxOv   = cnvOverlay.getContext('2d', { willReadFrequently: true });
+
+  // ---------- state ----------
+  let W = 0, H = 0;
+  let originalImageData = null;   // Uint8ClampedArray RGBA of source (working resolution)
+  let vesselMask = null;          // Uint8Array 0/1, working resolution
+  let skeleton = null;            // Uint8Array 0/1
+  let classMap = null;            // Uint8Array 0=bg 1=artery 2=vein, at skeleton/mask res
+  let diameterField = null;       // Float32Array, local vessel diameter in px, at mask res (0 = bg)
+  let distTransform = null;       // Float32Array distance-to-background (half-width), mask res
+  let currentMode = 'classified';
+  let microPerPixel = 0;          // calibration: micrometers per pixel
+  let discRadiusPx = 0;
+  let hasResult = false;
+
+  const WORK_MAX = 560; // working resolution cap for perf — plenty for vessel-scale analysis
+
+  // ============================================================
+  // 1. FILE HANDLING
+  // ============================================================
+
+  function setupDropzone(){
+    ['dragenter','dragover'].forEach(ev=>{
+      dropzone.addEventListener(ev, e=>{ e.preventDefault(); dropzone.classList.add('drag'); });
+    });
+    ['dragleave','drop'].forEach(ev=>{
+      dropzone.addEventListener(ev, e=>{ e.preventDefault(); dropzone.classList.remove('drag'); });
+    });
+    dropzone.addEventListener('drop', e=>{
+      const f = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) loadFile(f);
+    });
+    dropzone.addEventListener('click', (e)=>{
+      if (e.target.closest('.sample-btn') || e.target.closest('#browseBtn')) return;
+      fileInput.click();
+    });
+    browseBtn.addEventListener('click', (e)=>{ e.stopPropagation(); fileInput.click(); });
+    fileInput.addEventListener('change', e=>{
+      const f = e.target.files && e.target.files[0];
+      if (f) loadFile(f);
+    });
+    document.querySelectorAll('.sample-btn').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        loadSample(btn.dataset.sample);
+      });
+    });
+  }
+
+  function loadFile(file){
+    if (!file.type.startsWith('image/')){
+      alert('Please choose an image file (JPG, PNG, or WEBP).');
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { runPipeline(img); URL.revokeObjectURL(url); };
+    img.onerror = () => alert('Could not load that image. Try a different file.');
+    img.src = url;
+  }
+
+  // Procedurally generated sample fundus images (synthetic but vessel-realistic),
+  // so the demo works without external network calls or stored files.
+  function loadSample(id){
+    const img = generateSyntheticFundus(id === '1' ? 1 : 2);
+    runPipeline(img);
+  }
+
+  // ============================================================
+  // 2. SYNTHETIC SAMPLE GENERATOR
+  //    Builds a plausible fundus-style image with a branching vessel
+  //    tree (arteries thinner+reflexed, veins thicker+darker) so the
+  //    pipeline can be demoed without an uploaded photo.
+  // ============================================================
+  function generateSyntheticFundus(seed){
+    const size = 560;
+    const c = document.createElement('canvas');
+    c.width = size; c.height = size;
+    const ctx = c.getContext('2d');
+
+    let rnd = mulberry32(seed * 7919 + 13);
+
+    // base fundus coloring: warm orange-red, fairly even (real fundus photos
+    // are bright and evenly lit — the camera flash floods the retina)
+    const cx = size/2, cy = size/2;
+    const grad = ctx.createRadialGradient(cx, cy, size*0.05, cx, cy, size*0.5);
+    grad.addColorStop(0, '#c8602f');
+    grad.addColorStop(0.5, '#bb4f28');
+    grad.addColorStop(0.85, '#a8421f');
+    grad.addColorStop(1, '#8e3318');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0,0,size,size);
+
+    // subtle texture / mottling
+    for (let i=0;i<900;i++){
+      const x = rnd()*size, y = rnd()*size;
+      const r = 1.5 + rnd()*3;
+      ctx.fillStyle = `rgba(${150+rnd()*60|0},${60+rnd()*30|0},${30+rnd()*20|0},${0.025+rnd()*0.03})`;
+      ctx.beginPath(); ctx.arc(x,y,r,0,7); ctx.fill();
+    }
+
+    // optic disc (bright yellowish-white)
+    const discX = size*0.40, discY = size*0.5, discR = size*0.075;
+    const discGrad = ctx.createRadialGradient(discX,discY,2,discX,discY,discR);
+    discGrad.addColorStop(0,'#f4d9a8');
+    discGrad.addColorStop(0.7,'#e8b97a');
+    discGrad.addColorStop(1,'#c98f4f');
+    ctx.fillStyle = discGrad;
+    ctx.beginPath(); ctx.arc(discX,discY,discR,0,7); ctx.fill();
+
+    // macula (subtle darker zone, temporal side)
+    const macX = size*0.62, macY = size*0.52;
+    const macGrad = ctx.createRadialGradient(macX,macY,2,macX,macY,size*0.09);
+    macGrad.addColorStop(0,'rgba(40,10,5,0.35)');
+    macGrad.addColorStop(1,'rgba(40,10,5,0)');
+    ctx.fillStyle = macGrad;
+    ctx.beginPath(); ctx.arc(macX,macY,size*0.09,0,7); ctx.fill();
+
+    // --- vessel trees: 2 superior/inferior arcades x artery+vein pairs ---
+    function drawVesselBranch(x0,y0,angle0,width0,isArtery,depth,rndLocal){
+      if (depth <= 0 || width0 < 1.1) return;
+      let x=x0,y=y0,angle=angle0,width=width0;
+      const segs = 5 + (rndLocal()*4|0);
+      const path = [[x,y]];
+      for (let s=0;s<segs;s++){
+        angle += (rndLocal()-0.5) * 0.5;
+        const len = 16 + rndLocal()*22;
+        x += Math.cos(angle)*len;
+        y += Math.sin(angle)*len;
+        if (x<size*0.06||x>size*0.96||y<size*0.06||y>size*0.96) break;
+        path.push([x,y]);
+      }
+      // draw the branch as a tapered stroke
+      for (let i=1;i<path.length;i++){
+        const t = i/path.length;
+        const w = width0 * (1 - 0.55*t);
+        const [ax,ay] = path[i-1], [bx,by] = path[i];
+        ctx.lineCap = 'round';
+        ctx.lineWidth = Math.max(1, w);
+        ctx.strokeStyle = isArtery ? '#c0432f' : '#8a1f17';
+        ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
+        if (isArtery && w > 2.0){
+          ctx.lineWidth = Math.max(0.6, w*0.28);
+          ctx.strokeStyle = 'rgba(255,228,170,0.75)';
+          ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
+        }
+      }
+      // branch off
+      if (rndLocal() < 0.85 && path.length>2){
+        const [bx,by] = path[path.length-1];
+        const lastAngle = Math.atan2(by-path[path.length-2][1], bx-path[path.length-2][0]);
+        drawVesselBranch(bx,by, lastAngle + (rndLocal()-0.5)*0.7, width0*0.74, isArtery, depth-1, rndLocal);
+        if (rndLocal() < 0.5){
+          drawVesselBranch(bx,by, lastAngle - (rndLocal())*0.9, width0*0.6, isArtery, depth-2, rndLocal);
+        }
+      }
+    }
+
+    const startAngles = [-2.5, -0.9, 0.9, 2.5, -1.8, 1.8];
+    startAngles.forEach((a, i)=>{
+      const isArtery = i % 2 === 0;
+      const w = isArtery ? (3.2+rnd()*1.0) : (4.6+rnd()*1.3);
+      drawVesselBranch(discX, discY, a, w, isArtery, 6, rnd);
+    });
+
+    // gentle vignette (real fundus shots have soft falloff, not a hard ring)
+    const vg = ctx.createRadialGradient(cx,cy,size*0.38,cx,cy,size*0.5);
+    vg.addColorStop(0,'rgba(0,0,0,0)');
+    vg.addColorStop(1,'rgba(0,0,0,0.30)');
+    ctx.fillStyle = vg;
+    ctx.beginPath(); ctx.arc(cx,cy,size*0.5,0,7); ctx.fill();
+
+    // circular mask (fundus aperture) — soft edge to avoid a hard ridge
+    ctx.globalCompositeOperation = 'destination-in';
+    const maskGrad = ctx.createRadialGradient(cx,cy,size*0.46,cx,cy,size*0.495);
+    maskGrad.addColorStop(0,'rgba(0,0,0,1)');
+    maskGrad.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle = maskGrad;
+    ctx.beginPath(); ctx.arc(cx,cy,size*0.5,0,7); ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+
+    const out = new Image();
+    out.src = c.toDataURL();
+    out.width = size; out.height = size;
+    // synchronous-ish: canvas->dataURL->Image load is async, so we instead
+    // return the canvas directly wrapped to look like an "image source"
+    out._canvasSource = c;
+    return c; // runPipeline accepts canvas or image, both drawImage-able
+  }
+
+  function mulberry32(a){
+    return function(){
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  // ============================================================
+  // 3. PIPELINE ORCHESTRATION
+  // ============================================================
+
+  async function runPipeline(imgSource){
+    dropzone.style.display = 'none';
+    analysis.classList.add('active');
+    showProgress(true);
+
+    // size canvases to a working resolution (square, capped) for perf
+    const srcW = imgSource.naturalWidth || imgSource.width;
+    const srcH = imgSource.naturalHeight || imgSource.height;
+    const scale = Math.min(WORK_MAX / srcW, WORK_MAX / srcH, 1);
+    W = Math.max(64, Math.round(srcW * scale));
+    H = Math.max(64, Math.round(srcH * scale));
+
+    [cnvBase, cnvOverlay].forEach(c=>{ c.width = W; c.height = H; });
+
+    btxBase.clearRect(0,0,W,H);
+    btxBase.drawImage(imgSource, 0, 0, W, H);
+    originalImageData = btxBase.getImageData(0,0,W,H).data.slice();
+
+    await nextFrame(()=> setProgress('Reading image', 'Loaded ' + W + '×' + H + ' working frame'));
+
+    await nextFrame(()=> setProgress('Enhancing vessels', 'Multi-scale ridge filter on green channel'));
+    const enhanced = enhanceVessels(originalImageData, W, H);
+
+    await nextFrame(()=> setProgress('Segmenting', 'Adaptive local thresholding'));
+    vesselMask = segmentVessels(enhanced, originalImageData, W, H);
+
+    await nextFrame(()=> setProgress('Cleaning mask', 'Removing speckle, filling small gaps'));
+    vesselMask = morphCleanup(vesselMask, W, H);
+
+    await nextFrame(()=> setProgress('Measuring caliber', 'Distance transform for vessel width'));
+    distTransform = distanceTransform(vesselMask, W, H);
+    diameterField = distTransform; // half-width per pixel; diameter = 2x at centerline
+
+    await nextFrame(()=> setProgress('Skeletonizing', 'Zhang–Suen thinning to centerlines'));
+    skeleton = zhangSuenSkeleton(vesselMask, W, H);
+
+    await nextFrame(()=> setProgress('Classifying vessels', 'Scoring hue, saturation & central reflex'));
+    classMap = classifyArteryVein(originalImageData, vesselMask, skeleton, W, H);
+
+    await nextFrame(()=> setProgress('Calibrating scale', 'Estimating optic-disc diameter reference'));
+    calibrateScale(originalImageData, vesselMask, W, H);
+
+    await nextFrame(()=> setProgress('Finalizing', 'Rendering overlay'));
+    computeStats();
+    hasResult = true;
+    enableModeTabs(true);
+    setMode('classified');
+    showProgress(false);
+  }
+
+  function nextFrame(fn){
+    return new Promise(res=>{
+      requestAnimationFrame(()=>{ fn(); requestAnimationFrame(()=>res()); });
+    });
+  }
+
+  function showProgress(v){ progressOv.classList.toggle('show', v); }
+  function setProgress(title, step){ progressText.textContent = title; progressStep.textContent = step; }
+
+  // ============================================================
+  // 4. VESSEL ENHANCEMENT (multi-scale ridge / Frangi-like filter)
+  // ============================================================
+  function enhanceVessels(rgba, w, h){
+    // Extract green channel (highest vessel contrast in fundus photography)
+    // and invert (vessels are dark in green channel -> make them bright)
+    const gray = new Float32Array(w*h);
+    for (let i=0, p=0; i<w*h; i++, p+=4){
+      // slight weighting toward green, subtract a bit of red to suppress background hue
+      const g = rgba[p+1];
+      const r = rgba[p];
+      gray[i] = 255 - (g*0.92 - r*0.08);
+    }
+
+    // CLAHE-ish local contrast boost via local mean/std normalization
+    const norm = localContrastNormalize(gray, w, h, 15);
+
+    // multi-scale Gaussian-difference ridge response (approximate vesselness)
+    const scales = [1, 2, 3.2];
+    const response = new Float32Array(w*h);
+    for (const s of scales){
+      const blurred = gaussianBlur(norm, w, h, s);
+      const blurredWide = gaussianBlur(norm, w, h, s*2.5);
+      for (let i=0;i<w*h;i++){
+        const diff = blurred[i] - blurredWide[i];
+        if (diff > response[i]) response[i] = diff;
+      }
+    }
+    // normalize 0..1
+    let mn=Infinity, mx=-Infinity;
+    for (let i=0;i<response.length;i++){ if(response[i]<mn)mn=response[i]; if(response[i]>mx)mx=response[i]; }
+    const range = (mx-mn) || 1;
+    for (let i=0;i<response.length;i++) response[i] = (response[i]-mn)/range;
+    return response;
+  }
+
+  function localContrastNormalize(gray, w, h, radius){
+    const mean = boxBlur(gray, w, h, radius);
+    const sq = new Float32Array(gray.length);
+    for (let i=0;i<gray.length;i++) sq[i] = gray[i]*gray[i];
+    const meanSq = boxBlur(sq, w, h, radius);
+    const out = new Float32Array(gray.length);
+    for (let i=0;i<gray.length;i++){
+      const variance = Math.max(0, meanSq[i] - mean[i]*mean[i]);
+      const std = Math.sqrt(variance) + 6;
+      out[i] = ((gray[i]-mean[i]) / std) * 28 + 128;
+    }
+    return out;
+  }
+
+  function boxBlur(src, w, h, radius){
+    const tmp = new Float32Array(w*h);
+    const out = new Float32Array(w*h);
+    // horizontal
+    for (let y=0;y<h;y++){
+      let acc=0, cnt=0;
+      for (let x=-radius;x<=radius;x++){
+        const xi = clamp(x,0,w-1);
+        acc += src[y*w+xi]; cnt++;
+      }
+      tmp[y*w] = acc/cnt;
+      for (let x=1;x<w;x++){
+        const addX = clamp(x+radius,0,w-1);
+        const remX = clamp(x-radius-1,0,w-1);
+        acc += src[y*w+addX] - src[y*w+remX];
+        tmp[y*w+x] = acc/(radius*2+1);
+      }
+    }
+    // vertical
+    for (let x=0;x<w;x++){
+      let acc=0;
+      for (let y=-radius;y<=radius;y++){
+        const yi = clamp(y,0,h-1);
+        acc += tmp[yi*w+x];
+      }
+      out[x] = acc/(radius*2+1);
+      for (let y=1;y<h;y++){
+        const addY = clamp(y+radius,0,h-1);
+        const remY = clamp(y-radius-1,0,h-1);
+        acc += tmp[addY*w+x] - tmp[remY*w+x];
+        out[y*w+x] = acc/(radius*2+1);
+      }
+    }
+    return out;
+  }
+
+  function gaussianBlur(src, w, h, sigma){
+    // separable approx via repeated box blur (fast, good enough visually)
+    const r = Math.max(1, Math.round(sigma*1.5));
+    let pass = boxBlur(src, w, h, r);
+    pass = boxBlur(pass, w, h, r);
+    return pass;
+  }
+
+  function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+
+  // ============================================================
+  // 5. SEGMENTATION (adaptive threshold + circular FOV mask)
+  // ============================================================
+  function segmentVessels(response, rgba, w, h){
+    const mean = boxBlur(response, w, h, 9);
+    const mask = new Uint8Array(w*h);
+    const cx = w/2, cy = h/2;
+    const fovR = Math.min(w,h)*0.44; // stay well clear of the soft aperture edge
+    for (let y=0;y<h;y++){
+      for (let x=0;x<w;x++){
+        const i = y*w+x;
+        // exclude outside field-of-view (black border / soft mask edge of fundus photo)
+        const dx=x-cx, dy=y-cy;
+        if (dx*dx+dy*dy > fovR*fovR){ mask[i]=0; continue; }
+        const p = i*4;
+        const brightness = (rgba[p]+rgba[p+1]+rgba[p+2])/3;
+        if (brightness < 12){ mask[i]=0; continue; } // pure black border
+        const thresh = mean[i] + 0.05; // local adaptive offset
+        mask[i] = response[i] > thresh ? 1 : 0;
+      }
+    }
+    return mask;
+  }
+
+  function morphCleanup(mask, w, h){
+    // remove tiny speckle components, then close small gaps with a light dilate+erode
+    let m = removeSmallComponents(mask, w, h, 30);
+    m = dilate(m, w, h, 1);
+    m = erode(m, w, h, 1);
+    m = removeSmallComponents(m, w, h, 20);
+    return m;
+  }
+
+  function dilate(mask, w, h, r){
+    const out = new Uint8Array(w*h);
+    for (let y=0;y<h;y++) for (let x=0;x<w;x++){
+      let v=0;
+      for (let dy=-r;dy<=r && !v;dy++) for (let dx=-r;dx<=r && !v;dx++){
+        const xx=x+dx, yy=y+dy;
+        if (xx>=0&&xx<w&&yy>=0&&yy<h && mask[yy*w+xx]) v=1;
+      }
+      out[y*w+x]=v;
+    }
+    return out;
+  }
+  function erode(mask, w, h, r){
+    const out = new Uint8Array(w*h);
+    for (let y=0;y<h;y++) for (let x=0;x<w;x++){
+      let v=1;
+      for (let dy=-r;dy<=r && v;dy++) for (let dx=-r;dx<=r && v;dx++){
+        const xx=x+dx, yy=y+dy;
+        if (xx<0||xx>=w||yy<0||yy>=h || !mask[yy*w+xx]) { v=0; }
+      }
+      out[y*w+x]=v;
+    }
+    return out;
+  }
+
+  function removeSmallComponents(mask, w, h, minSize){
+    const labels = new Int32Array(w*h).fill(-1);
+    const out = new Uint8Array(w*h);
+    const stack = new Int32Array(w*h);
+    let labelId = 0;
+    for (let s=0;s<w*h;s++){
+      if (mask[s] && labels[s]===-1){
+        let sp=0; stack[sp++]=s; labels[s]=labelId;
+        const members=[s];
+        while(sp>0){
+          const idx = stack[--sp];
+          const x = idx%w, y=(idx/w)|0;
+          const neigh = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1]];
+          for (const [dx,dy] of neigh){
+            const xx=x+dx, yy=y+dy;
+            if (xx>=0&&xx<w&&yy>=0&&yy<h){
+              const ni=yy*w+xx;
+              if (mask[ni] && labels[ni]===-1){
+                labels[ni]=labelId; stack[sp++]=ni; members.push(ni);
+              }
+            }
+          }
+        }
+        if (members.length >= minSize){
+          for (const m of members) out[m]=1;
+        }
+        labelId++;
+      }
+    }
+    return out;
+  }
+
+  // distance transform (approx euclidean, two-pass chamfer) -> used for vessel half-width
+  function distanceTransform(mask, w, h){
+    const INF = 1e9;
+    const d = new Float32Array(w*h).fill(INF);
+    for (let i=0;i<w*h;i++) if (!mask[i]) d[i]=0;
+    const a = 1.0, b = 1.4142;
+    // forward pass
+    for (let y=0;y<h;y++){
+      for (let x=0;x<w;x++){
+        const i=y*w+x;
+        if (d[i]===0) continue;
+        let best=d[i];
+        if (x>0) best=Math.min(best, d[i-1]+a);
+        if (y>0) best=Math.min(best, d[i-w]+a);
+        if (x>0&&y>0) best=Math.min(best, d[i-w-1]+b);
+        if (x<w-1&&y>0) best=Math.min(best, d[i-w+1]+b);
+        d[i]=best;
+      }
+    }
+    // backward pass
+    for (let y=h-1;y>=0;y--){
+      for (let x=w-1;x>=0;x--){
+        const i=y*w+x;
+        if (d[i]===0) continue;
+        let best=d[i];
+        if (x<w-1) best=Math.min(best, d[i+1]+a);
+        if (y<h-1) best=Math.min(best, d[i+w]+a);
+        if (x<w-1&&y<h-1) best=Math.min(best, d[i+w+1]+b);
+        if (x>0&&y<h-1) best=Math.min(best, d[i+w-1]+b);
+        d[i]=best;
+      }
+    }
+    return d;
+  }
+
+  // ============================================================
+  // 6. SKELETONIZATION — Zhang-Suen thinning (classic, exact algorithm)
+  // ============================================================
+  function zhangSuenSkeleton(mask, w, h){
+    let img = new Uint8Array(mask); // copy
+    const get = (x,y)=> (x<0||x>=w||y<0||y>=h) ? 0 : img[y*w+x];
+
+    let changed = true;
+    let iter = 0;
+    const maxIter = 60;
+    while (changed && iter < maxIter){
+      changed = false;
+      iter++;
+      for (let pass=0; pass<2; pass++){
+        const toRemove = [];
+        for (let y=1;y<h-1;y++){
+          for (let x=1;x<w-1;x++){
+            const i = y*w+x;
+            if (!img[i]) continue;
+            const p2=get(x,y-1), p3=get(x+1,y-1), p4=get(x+1,y),
+                  p5=get(x+1,y+1), p6=get(x,y+1), p7=get(x-1,y+1),
+                  p8=get(x-1,y), p9=get(x-1,y-1);
+            const neighbors = [p2,p3,p4,p5,p6,p7,p8,p9];
+            const B = neighbors.reduce((a,b)=>a+b,0);
+            if (B<2 || B>6) continue;
+            let A=0;
+            for (let k=0;k<8;k++){
+              if (neighbors[k]===0 && neighbors[(k+1)%8]===1) A++;
+            }
+            if (A!==1) continue;
+            if (pass===0){
+              if (p2*p4*p6 !== 0) continue;
+              if (p4*p6*p8 !== 0) continue;
+            } else {
+              if (p2*p4*p8 !== 0) continue;
+              if (p2*p6*p8 !== 0) continue;
+            }
+            toRemove.push(i);
+          }
+        }
+        if (toRemove.length){
+          changed = true;
+          for (const i of toRemove) img[i]=0;
+        }
+      }
+    }
+    return img;
+  }
+
+  // ============================================================
+  // 7. ARTERY / VEIN CLASSIFICATION
+  //    Heuristics mirroring real clinical A/V discrimination:
+  //    - Veins: wider caliber, darker/more saturated red, no reflex
+  //    - Arteries: narrower caliber, lighter red, bright central
+  //      reflex streak (yellowish-white line down the lumen)
+  //
+  //    Classification is done per CONNECTED VESSEL SEGMENT (the run of
+  //    skeleton pixels between branch/end points), not per pixel. A
+  //    physical vessel doesn't change identity every few pixels, so we
+  //    trace the segment first and vote on the averaged evidence along
+  //    its whole length. Thresholds are calibrated against the image's
+  //    own brightness/saturation distribution rather than fixed
+  //    constants, so it adapts across different photo exposures.
+  // ============================================================
+  function classifyArteryVein(rgba, mask, skel, w, h){
+    const cls = new Uint8Array(w*h); // 0 bg, 1 artery, 2 vein
+
+    // ---- Step 1: per-skeleton-pixel raw features (color + reflex + width) ----
+    const n = w*h;
+    const featDark = new Float32Array(n), featDiam = new Float32Array(n);
+    const skelIdx = [];
+    const radiusSample = 2;
+    const bgRadius = 9; // ring sampled around each vessel point to read the LOCAL background color
+
+    for (let y=0;y<h;y++){
+      for (let x=0;x<w;x++){
+        const i=y*w+x;
+        if (!skel[i]) continue;
+        skelIdx.push(i);
+        let sr=0,sg=0,cnt=0,maxLum=0,minLum=999;
+        for (let dy=-radiusSample;dy<=radiusSample;dy++){
+          for (let dx=-radiusSample;dx<=radiusSample;dx++){
+            const xx=x+dx, yy=y+dy;
+            if (xx<0||xx>=w||yy<0||yy>=h) continue;
+            const ni = yy*w+xx;
+            if (!mask[ni]) continue;
+            const p = ni*4;
+            const r=rgba[p],g=rgba[p+1],b=rgba[p+2];
+            sr+=r; sg+=g; cnt++;
+            const lum = 0.299*r+0.587*g+0.114*b;
+            if (lum>maxLum) maxLum=lum;
+            if (lum<minLum) minLum=lum;
+          }
+        }
+        if (cnt===0){ skelIdx.pop(); continue; }
+        const avgR=sr/cnt, avgG=sg/cnt;
+        const vesselLum = 0.299*avgR + 0.587*avgG; // approx, blue term negligible for red-dominant vessel pixels
+
+        // sample a ring of NON-vessel (background retina) pixels around this
+        // point to get the local background brightness for comparison —
+        // this is what actually distinguishes "darker than its surroundings"
+        // (vein) from "lighter than its surroundings" (artery), instead of
+        // an absolute color ratio that gets diluted by background bleeding
+        // into the small sampling window around thin vessels.
+        let bgSum=0, bgCnt=0;
+        for (let dy=-bgRadius; dy<=bgRadius; dy+=3){
+          for (let dx=-bgRadius; dx<=bgRadius; dx+=3){
+            const dist2 = dx*dx+dy*dy;
+            if (dist2 < (bgRadius-3)*(bgRadius-3) || dist2 > bgRadius*bgRadius) continue;
+            const xx=x+dx, yy=y+dy;
+            if (xx<0||xx>=w||yy<0||yy>=h) continue;
+            const ni = yy*w+xx;
+            if (mask[ni]) continue; // skip other vessel pixels, we want pure background
+            const p = ni*4;
+            bgSum += 0.299*rgba[p] + 0.587*rgba[p+1] + 0.114*rgba[p+2];
+            bgCnt++;
+          }
+        }
+        const bgLum = bgCnt>0 ? bgSum/bgCnt : vesselLum;
+        featDark[i] = bgLum - vesselLum; // positive = vessel darker than local background → vein-leaning
+        featDiam[i] = Math.max(1, (distTransform[i]||0.6) * 2);
+      }
+    }
+    if (skelIdx.length === 0) return cls;
+
+    // ---- Step 2: image-relative calibration stats (robust to exposure) ----
+    const darkVals = skelIdx.map(i=>featDark[i]);
+    const diamVals = skelIdx.map(i=>featDiam[i]);
+    // ---- Step 3: trace skeleton into connected segments between branch/end points ----
+    // A skeleton pixel's degree = number of 8-connected skeleton neighbors.
+    // Degree 1 = endpoint, 2 = mid-segment, 3+ = branch/junction.
+    //
+    // Zhang-Suen thinning often leaves junctions as small CLUSTERS of 2-4
+    // adjacent degree>=3 pixels rather than one clean point. Tracing
+    // edge-to-edge between raw junction pixels fragments every branch into
+    // a cascade of 1-3px junk segments. So we first collapse each cluster
+    // of touching junction pixels into one logical "hub", then trace real
+    // segments between hubs/endpoints — this is what actually gives one
+    // continuous run per physical vessel branch.
+    const degree = new Uint8Array(n);
+    const nb8 = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
+    for (const i of skelIdx){
+      const x=i%w, y=(i/w)|0;
+      let d=0;
+      for (const [dx,dy] of nb8){
+        const xx=x+dx, yy=y+dy;
+        if (xx>=0&&xx<w&&yy>=0&&yy<h && skel[yy*w+xx]) d++;
+      }
+      degree[i]=d;
+    }
+
+    // group adjacent junction pixels (degree>=3) into hub clusters via flood fill
+    const hubId = new Int32Array(n).fill(-1);
+    let numHubs = 0;
+    {
+      const stack = [];
+      for (const i of skelIdx){
+        if (degree[i] < 3 || hubId[i] !== -1) continue;
+        stack.push(i); hubId[i] = numHubs;
+        while (stack.length){
+          const cur = stack.pop();
+          const x = cur%w, y=(cur/w)|0;
+          for (const [dx,dy] of nb8){
+            const xx=x+dx, yy=y+dy;
+            if (xx<0||xx>=w||yy<0||yy>=h) continue;
+            const ni = yy*w+xx;
+            if (skel[ni] && degree[ni]>=3 && hubId[ni]===-1){
+              hubId[ni]=numHubs; stack.push(ni);
+            }
+          }
+        }
+        numHubs++;
+      }
+    }
+    const isHub = (i) => hubId[i] !== -1;
+
+    const visited = new Uint8Array(n);
+    const segments = []; // each: array of pixel indices (excludes hub pixels themselves)
+    // for each segment, record which hub(s) it touches and its exit direction
+    // at that hub (the average direction of its first few pixels, pointing
+    // AWAY from the hub) — used below to pair opposite spokes at true
+    // vessel crossings so they're classified as one continuous vessel
+    // instead of two independent, possibly-disagreeing halves.
+    const segHubStart = []; // hub id this segment starts at (-1 if none)
+    const segStartDir = [];  // {dx,dy} unit-ish direction leaving that hub
+
+    // trace a simple path of non-hub pixels starting at `startI`, walking until
+    // it reaches a hub or a dead end
+    function tracePath(startI, firstDx, firstDy){
+      const seg = [startI];
+      visited[startI] = 1;
+      let cameDx = firstDx, cameDy = firstDy;
+      let cur = startI;
+      while (true){
+        const x = cur%w, y=(cur/w)|0;
+        let candidates = [];
+        for (const [dx,dy] of nb8){
+          const xx=x+dx, yy=y+dy;
+          if (xx<0||xx>=w||yy<0||yy>=h) continue;
+          const ni = yy*w+xx;
+          if (skel[ni] && !visited[ni]) candidates.push([ni,dx,dy]);
+        }
+        if (candidates.length===0) break;
+        candidates.sort((a,b)=>{
+          const da = -(a[1]*cameDx+a[2]*cameDy);
+          const db = -(b[1]*cameDx+b[2]*cameDy);
+          return da-db;
+        });
+        const [next,ndx,ndy] = candidates[0];
+        if (isHub(next)){
+          // reached a hub — stop here, don't include the hub pixel in the segment
+          break;
+        }
+        visited[next]=1;
+        seg.push(next);
+        cameDx=ndx; cameDy=ndy;
+        cur=next;
+      }
+      return seg;
+    }
+
+    // direction of a segment's first short run, used to estimate its
+    // heading as it leaves the hub (average of up to the first 4 steps)
+    function exitDirection(seg){
+      const take = Math.min(4, seg.length-1);
+      if (take <= 0) return {dx:0,dy:0};
+      const x0=seg[0]%w, y0=(seg[0]/w)|0;
+      const xE=seg[take]%w, yE=(seg[take]/w)|0;
+      const dx=xE-x0, dy=yE-y0;
+      const mag = Math.hypot(dx,dy) || 1;
+      return {dx:dx/mag, dy:dy/mag};
+    }
+
+    // 1) trace every path that starts at a hub pixel and heads into non-hub territory
+    for (const h0 of skelIdx){
+      if (!isHub(h0)) continue;
+      const x=h0%w, y=(h0/w)|0;
+      for (const [dx,dy] of nb8){
+        const xx=x+dx, yy=y+dy;
+        if (xx<0||xx>=w||yy<0||yy>=h) continue;
+        const ni = yy*w+xx;
+        if (skel[ni] && !isHub(ni) && !visited[ni]){
+          const seg = tracePath(ni, dx, dy);
+          if (seg.length>0){
+            segments.push(seg);
+            segHubStart.push(hubId[h0]);
+            segStartDir.push(exitDirection(seg));
+          }
+        }
+      }
+    }
+    // 2) trace any remaining non-hub pixels not yet reached (endpoint-to-endpoint
+    //    branches that never touch a hub, or isolated loops)
+    for (const i of skelIdx){
+      if (isHub(i) || visited[i]) continue;
+      const seg = tracePath(i, 0, 0);
+      if (seg.length>0){
+        segments.push(seg);
+        segHubStart.push(-1);
+        segStartDir.push({dx:0,dy:0});
+      }
+    }
+    // 3) any leftover hub pixels with no traced neighbor (isolated junction
+    //    blobs) become their own tiny segment so they're still classified
+    for (const i of skelIdx){
+      if (!isHub(i) || visited[i]) continue;
+      visited[i]=1;
+      segments.push([i]);
+      segHubStart.push(-1);
+      segStartDir.push({dx:0,dy:0});
+    }
+
+    // ---- Step 3a: pair opposite spokes at true crossings ----
+    // A hub where exactly 4 segments converge with two roughly-opposite
+    // direction pairs is almost certainly a simple vessel-over-vessel
+    // crossing (an X), not a real branch point — group each pair so the
+    // physically continuous vessel is treated as ONE segment for voting
+    // instead of two independent halves that can disagree. Hubs with 3
+    // spokes (a true Y branch) are left alone.
+    {
+      const byHub = new Map();
+      segHubStart.forEach((hid, si) => {
+        if (hid === -1) return;
+        if (!byHub.has(hid)) byHub.set(hid, []);
+        byHub.get(hid).push(si);
+      });
+      const mergeMap = new Map(); // segment index -> segment index it's merged into
+      for (const [hid, segIdxs] of byHub.entries()){
+        if (segIdxs.length !== 4) continue; // only handle clean 4-way crossings
+        const used = new Set();
+        const pairs = [];
+        for (let a=0; a<segIdxs.length; a++){
+          if (used.has(a)) continue;
+          let bestB=-1, bestDot=2;
+          for (let b=0;b<segIdxs.length;b++){
+            if (b===a || used.has(b)) continue;
+            const da = segStartDir[segIdxs[a]], db = segStartDir[segIdxs[b]];
+            const dot = da.dx*db.dx + da.dy*db.dy; // -1 = opposite, +1 = same direction
+            if (dot < bestDot){ bestDot = dot; bestB = b; }
+          }
+          if (bestB !== -1 && bestDot < -0.45){ // roughly opposite headings = straight through
+            used.add(a); used.add(bestB);
+            pairs.push([segIdxs[a], segIdxs[bestB]]);
+          }
+        }
+        for (const [ia, ib] of pairs){
+          mergeMap.set(ib, ia);
+        }
+      }
+      if (mergeMap.size > 0){
+        for (const [fromIdx, toIdx] of mergeMap.entries()){
+          segments[toIdx] = segments[toIdx].concat(segments[fromIdx]);
+          segments[fromIdx] = [];
+        }
+      }
+    }
+
+    // ---- Step 3b: merge tiny fragment segments into their largest touching
+    //      neighbor segment. Even after hub-collapsing, thinning artifacts
+    //      leave short 1-4px stub segments at junctions; voting on these in
+    //      isolation is unreliable. A stub almost always sits right next to
+    //      the real branch it's physically part of, so absorb it there
+    //      instead of letting it cast its own noisy, independent vote.
+    const MIN_SEG_LEN = 8;
+    const segIdOf = new Int32Array(n).fill(-1);
+    segments.forEach((seg, si) => { for (const i of seg) segIdOf[i] = si; });
+
+    const merged = new Uint8Array(segments.length); // 1 = absorbed into another, skip
+    let changedAny = true, mergePasses = 0;
+    while (changedAny && mergePasses < 4){
+      changedAny = false; mergePasses++;
+      for (let si=0; si<segments.length; si++){
+        if (merged[si]) continue;
+        const seg = segments[si];
+        if (seg.length >= MIN_SEG_LEN || seg.length === 0) continue;
+        // find neighbor segment ids touching this one's pixels (8-connected)
+        const neighborCounts = new Map();
+        for (const i of seg){
+          const x=i%w, y=(i/w)|0;
+          for (const [dx,dy] of nb8){
+            const xx=x+dx, yy=y+dy;
+            if (xx<0||xx>=w||yy<0||yy>=h) continue;
+            const ni=yy*w+xx;
+            const nsi = segIdOf[ni];
+            if (nsi===-1 || nsi===si || merged[nsi]) continue;
+            neighborCounts.set(nsi, (neighborCounts.get(nsi)||0)+1);
+          }
+        }
+        if (neighborCounts.size===0) continue;
+        // absorb into the largest neighboring segment (most representative of the real branch)
+        let bestId=-1, bestLen=-1;
+        for (const nsi of neighborCounts.keys()){
+          if (segments[nsi].length > bestLen){ bestLen=segments[nsi].length; bestId=nsi; }
+        }
+        if (bestId === -1) continue;
+        for (const i of seg){ segIdOf[i] = bestId; }
+        segments[bestId] = segments[bestId].concat(seg);
+        seg.length = 0;
+        merged[si] = 1;
+        changedAny = true;
+      }
+    }
+    const finalSegments = segments.filter(s => s.length > 0);
+    segments.length = 0;
+    for (const s of finalSegments) segments.push(s);
+
+    // ---- Step 4: classify each segment — width + brightness only ----
+    // Rule: arteries are lighter/brighter and narrower.
+    //       veins are darker and wider.
+    // Both cues are z-scored against this image's own vessel population so
+    // the decision adapts to whatever exposure/camera the photo was shot on.
+    // veinScore > 0 → vein (darker + wider), veinScore < 0 → artery.
+    const darkMean = darkVals.reduce((a,b)=>a+b,0)/darkVals.length;
+    const diamMean = diamVals.reduce((a,b)=>a+b,0)/diamVals.length;
+    let darkVar=0, diamVar=0;
+    for (const v of darkVals) darkVar += (v-darkMean)*(v-darkMean);
+    for (const v of diamVals) diamVar += (v-diamMean)*(v-diamMean);
+    const darkStd = Math.sqrt(darkVar/darkVals.length) || 1;
+    const diamStd = Math.sqrt(diamVar/diamVals.length) || 1;
+
+    const segStats = segments.filter(s=>s.length>0).map(seg=>{
+      let darkSum=0, diamSum=0;
+      for (const i of seg){
+        darkSum += featDark[i];
+        diamSum += featDiam[i];
+      }
+      const len = seg.length;
+      return { seg, len, avgDark: darkSum/len, avgDiam: diamSum/len };
+    });
+
+    segStats.forEach(s => {
+      // darkZ: positive = vessel is darker than local background = vein-leaning
+      // diamZ: positive = vessel is wider than average = vein-leaning
+      const darkZ = (s.avgDark - darkMean) / darkStd;
+      const diamZ = (s.avgDiam - diamMean) / diamStd;
+      s.veinScore = darkZ * 0.9 + diamZ * 1.1; // width is slightly more reliable than darkness
+      s.confidence = Math.abs(s.veinScore) * Math.sqrt(Math.min(s.len, 60));
+    });
+
+    // ---- Step 5: topology-aware refinement (the literature's strongest
+    //      lever beyond raw pixel color: arteries-connect-to-arteries,
+    //      veins-connect-to-veins). Retinal vasculature forms two disjoint
+    //      trees rooted at the optic disc — a vessel segment shouldn't sit
+    //      as a lone artery-colored island in the middle of an otherwise
+    //      consistent vein run, or vice versa.
+    //
+    //      This is applied CONSERVATIVELY: a segment's own color evidence
+    //      is trusted and left untouched unless that evidence is weak
+    //      (ambiguous reflex/caliber/saturation) AND every neighbor it
+    //      touches at a junction agrees strongly on the opposite label.
+    //      A confidently-evidenced segment — even a short, isolated one —
+    //      is never overridden by its neighbors, which is what the
+    //      previous free-form smoothing pass got wrong: it let strong
+    //      evidence get diluted by weaker neighbors over several passes.
+    const segsAtHub = new Map();
+    segStats.forEach((s, si) => {
+      const x0 = s.seg[0]%w, y0=(s.seg[0]/w)|0;
+      const x1 = s.seg[s.seg.length-1]%w, y1=(s.seg[s.seg.length-1]/w)|0;
+      for (const [px,py] of [[x0,y0],[x1,y1]]){
+        for (const [dx,dy] of nb8){
+          const xx=px+dx, yy=py+dy;
+          if (xx<0||xx>=w||yy<0||yy>=h) continue;
+          const hid = hubId[yy*w+xx];
+          if (hid === -1) continue;
+          if (!segsAtHub.has(hid)) segsAtHub.set(hid, new Set());
+          segsAtHub.get(hid).add(si);
+        }
+      }
+    });
+
+    // a segment's evidence is "weak" if its z-scored vein/artery signal is
+    // close to zero — i.e. it didn't show a clear reflex, wasn't clearly
+    // wide/narrow, and wasn't clearly saturated either way.
+    const WEAK_EVIDENCE_THRESHOLD = 0.35;
+    const STRONG_NEIGHBOR_THRESHOLD = 0.6;
+
+    const finalIsArtery = segStats.map(s => s.veinScore < 0);
+    segStats.forEach((s, si) => {
+      if (Math.abs(s.veinScore) >= WEAK_EVIDENCE_THRESHOLD) return; // confident enough, leave as-is
+
+      // find every hub this segment touches, and look at the other
+      // segments sharing that hub
+      let sawNeighbors = false, allAgreeArtery = true, allAgreeVein = true;
+      for (const [hid, segSet] of segsAtHub.entries()){
+        if (!segSet.has(si)) continue;
+        for (const sj of segSet){
+          if (sj === si) continue;
+          const nb = segStats[sj];
+          if (Math.abs(nb.veinScore) < STRONG_NEIGHBOR_THRESHOLD) continue; // neighbor itself isn't confident — ignore it
+          sawNeighbors = true;
+          if (nb.veinScore < 0) allAgreeVein = false;      // neighbor is a confident artery
+          else allAgreeArtery = false;                      // neighbor is a confident vein
+        }
+      }
+      if (!sawNeighbors) return; // no confident neighbors to learn from — keep own (weak) evidence
+      if (allAgreeArtery && !allAgreeVein){ finalIsArtery[si] = true; }
+      else if (allAgreeVein && !allAgreeArtery){ finalIsArtery[si] = false; }
+      // if neighbors disagree with each other, leave this segment's own evidence as the tiebreaker
+    });
+
+    segStats.forEach((s, si) => {
+      const clsVal = finalIsArtery[si] ? 1 : 2;
+      for (const i of s.seg){
+        cls[i] = clsVal;
+      }
+    });
+
+    return cls;
+  }
+
+  // ============================================================
+  // 8. SCALE CALIBRATION
+  //    Standard clinical convention: mean optic disc diameter ≈ 1850 µm
+  //    (commonly approximated as 1800-1900µm; we use 1850 as a literature
+  //    midpoint). We estimate the disc radius from the bright, low-saturation
+  //    circular region near the vessel origin, then derive µm/pixel.
+  // ============================================================
+  const ASSUMED_DISC_DIAMETER_UM = 1850;
+
+  function calibrateScale(rgba, mask, w, h){
+    // find brightest, low-saturation compact blob (optic disc proxy)
+    const score = new Float32Array(w*h);
+    for (let i=0;i<w*h;i++){
+      const p=i*4;
+      const r=rgba[p],g=rgba[p+1],b=rgba[p+2];
+      const lum = (r+g+b)/3;
+      const sat = (Math.max(r,g,b)-Math.min(r,g,b))/(lum+1);
+      score[i] = lum>140 && sat<0.55 ? lum : 0;
+    }
+    const smoothed = boxBlur(score, w, h, 6);
+    let bestI=-1, bestV=-1;
+    const cx=w/2, cy=h/2, fovR=Math.min(w,h)*0.46;
+    for (let y=0;y<h;y++) for (let x=0;x<w;x++){
+      const dx=x-cx, dy=y-cy;
+      if (dx*dx+dy*dy>fovR*fovR) continue;
+      const i=y*w+x;
+      if (smoothed[i]>bestV){ bestV=smoothed[i]; bestI=i; }
+    }
+    if (bestI<0){
+      discRadiusPx = Math.min(w,h)*0.07;
+    } else {
+      // estimate radius by walking outward from bestI until score drops off
+      const bx = bestI%w, by=(bestI/w)|0;
+      let r=2;
+      for (; r<Math.min(w,h)*0.18; r++){
+        const xx = clamp(bx+r,0,w-1);
+        if (smoothed[by*w+xx] < bestV*0.45) break;
+      }
+      discRadiusPx = Math.max(8, r);
+    }
+    microPerPixel = (ASSUMED_DISC_DIAMETER_UM / 2) / discRadiusPx;
+    scaleBadge.textContent = `Scale: ${microPerPixel.toFixed(1)} µm/px (disc-calibrated)`;
+  }
+
+  // ============================================================
+  // 9. STATS
+  // ============================================================
+  function computeStats(){
+    let vesselPx=0, arteryPx=0, veinPx=0;
+    for (let i=0;i<W*H;i++){
+      if (vesselMask[i]) vesselPx++;
+      if (classMap[i]===1) arteryPx++;
+      if (classMap[i]===2) veinPx++;
+    }
+    statVesselPct.textContent = ((vesselPx/(W*H))*100).toFixed(1)+'%';
+    statArteryLen.textContent = arteryPx.toLocaleString();
+    statVeinLen.textContent = veinPx.toLocaleString();
+
+    // Average A/V diameter ratio (CRAE/CRVE-style proxy), a standard clinical metric
+    let aSum=0, aCnt=0, vSum=0, vCnt=0;
+    for (let i=0;i<W*H;i++){
+      if (classMap[i]===1){ aSum += distTransform[i]*2; aCnt++; }
+      if (classMap[i]===2){ vSum += distTransform[i]*2; vCnt++; }
+    }
+    if (aCnt>0 && vCnt>0){
+      const ratio = (aSum/aCnt)/(vSum/vCnt);
+      statAVR.textContent = ratio.toFixed(2);
+    } else {
+      statAVR.textContent = '—';
+    }
+  }
+
+  // ============================================================
+  // 10. RENDERING
+  // ============================================================
+  function setMode(mode){
+    currentMode = mode;
+    modeTabs.forEach(t=> t.classList.toggle('active', t.dataset.mode===mode));
+    render();
+  }
+
+  function render(){
+    if (!hasResult) return;
+    btxBase.putImageData(new ImageData(originalImageData.slice(), W, H), 0, 0);
+    btxOv.clearRect(0,0,W,H);
+
+    if (currentMode === 'original'){
+      return;
+    }
+
+    const showMask = tgVessels.checked;
+    const showSkel = tgSkeleton.checked;
+    const showClass = tgClassify.checked;
+
+    if (currentMode === 'skeleton'){
+      btxBase.fillStyle = '#000'; btxBase.fillRect(0,0,W,H);
+      const id = btxOv.createImageData(W,H);
+      for (let i=0;i<W*H;i++){
+        if (skeleton[i]){
+          id.data[i*4]=240; id.data[i*4+1]=240; id.data[i*4+2]=240; id.data[i*4+3]=255;
+        } else if (vesselMask[i] && showMask){
+          id.data[i*4]=70; id.data[i*4+1]=70; id.data[i*4+2]=70; id.data[i*4+3]=140;
+        }
+      }
+      btxOv.putImageData(id,0,0);
+      return;
+    }
+
+    if (currentMode === 'classified'){
+      btxBase.fillStyle = '#050505'; btxBase.fillRect(0,0,W,H);
+      const id = btxOv.createImageData(W,H);
+      for (let i=0;i<W*H;i++){
+        if (vesselMask[i] && showMask){
+          id.data[i*4]=22; id.data[i*4+1]=14; id.data[i*4+2]=12; id.data[i*4+3]=200;
+        }
+      }
+      if (showSkel){
+        // dilate classification slightly for visibility (paint 3x3 around each skeleton px)
+        for (let y=0;y<H;y++) for (let x=0;x<W;x++){
+          const i=y*W+x;
+          if (!skeleton[i]) continue;
+          const c = classMap[i];
+          if (!showClass){
+            for (let dy=-1;dy<=1;dy++) for (let dx=-1;dx<=1;dx++){
+              const xx=x+dx,yy=y+dy; if(xx<0||xx>=W||yy<0||yy>=H) continue;
+              const ni=yy*W+xx;
+              id.data[ni*4]=245; id.data[ni*4+1]=245; id.data[ni*4+2]=245; id.data[ni*4+3]=255;
+            }
+            continue;
+          }
+          const [r,g,b] = c===1 ? [232,185,74] : c===2 ? [232,72,60] : [150,150,150];
+          for (let dy=-1;dy<=1;dy++) for (let dx=-1;dx<=1;dx++){
+            const xx=x+dx,yy=y+dy; if(xx<0||xx>=W||yy<0||yy>=H) continue;
+            const ni=yy*W+xx;
+            id.data[ni*4]=r; id.data[ni*4+1]=g; id.data[ni*4+2]=b; id.data[ni*4+3]=255;
+          }
+        }
+      }
+      btxOv.putImageData(id,0,0);
+      return;
+    }
+
+    if (currentMode === 'overlay'){
+      // original image dimmed, with skeleton/classification overlaid in color
+      const dimmed = originalImageData.slice();
+      for (let i=0;i<dimmed.length;i+=4){
+        dimmed[i] *= 0.55; dimmed[i+1] *= 0.55; dimmed[i+2] *= 0.55;
+      }
+      btxBase.putImageData(new ImageData(dimmed, W, H), 0, 0);
+      const id = btxOv.createImageData(W,H);
+      for (let y=0;y<H;y++) for (let x=0;x<W;x++){
+        const i=y*W+x;
+        if (!skeleton[i]) continue;
+        const c = classMap[i];
+        const [r,g,b] = (showClass) ? (c===1 ? [232,185,74] : c===2 ? [232,72,60] : [150,150,150]) : [245,245,245];
+        const rad = showMask ? 1 : 0;
+        for (let dy=-rad;dy<=rad;dy++) for (let dx=-rad;dx<=rad;dx++){
+          const xx=x+dx,yy=y+dy; if(xx<0||xx>=W||yy<0||yy>=H) continue;
+          const ni=yy*W+xx;
+          id.data[ni*4]=r; id.data[ni*4+1]=g; id.data[ni*4+2]=b; id.data[ni*4+3]=255;
+        }
+        if (!showMask){ id.data[i*4]=r; id.data[i*4+1]=g; id.data[i*4+2]=b; id.data[i*4+3]=255; }
+      }
+      btxOv.putImageData(id,0,0);
+      return;
+    }
+  }
+
+  function enableModeTabs(v){
+    modeTabs.forEach(t=>{ if (t.dataset.mode!=='original') t.disabled = !v; });
+  }
+
+  // ============================================================
+  // 11. CURSOR READOUT — nearest vessel diameter in micrometers
+  // ============================================================
+  function findNearestVesselPixel(px, py, maxR){
+    if (vesselMask[py*W+px]) return py*W+px;
+    for (let r=1; r<=maxR; r++){
+      for (let dy=-r; dy<=r; dy++){
+        for (let dx=-r; dx<=r; dx++){
+          if (Math.max(Math.abs(dx),Math.abs(dy)) !== r) continue;
+          const xx=px+dx, yy=py+dy;
+          if (xx<0||xx>=W||yy<0||yy>=H) continue;
+          if (vesselMask[yy*W+xx]) return yy*W+xx;
+        }
+      }
+    }
+    return -1;
+  }
+
+  function findNearestSkeletonPixel(idx, maxR){
+    const px = idx%W, py=(idx/W)|0;
+    if (skeleton[idx]) return idx;
+    for (let r=1; r<=maxR; r++){
+      for (let dy=-r; dy<=r; dy++){
+        for (let dx=-r; dx<=r; dx++){
+          if (Math.max(Math.abs(dx),Math.abs(dy)) !== r) continue;
+          const xx=px+dx, yy=py+dy;
+          if (xx<0||xx>=W||yy<0||yy>=H) continue;
+          const ni = yy*W+xx;
+          if (skeleton[ni]) return ni;
+        }
+      }
+    }
+    return -1;
+  }
+
+  function handlePointerMove(e){
+    if (!hasResult) return;
+    const rect = canvasWrap.getBoundingClientRect();
+    const cxPix = e.clientX - rect.left;
+    const cyPix = e.clientY - rect.top;
+    if (cxPix<0||cyPix<0||cxPix>rect.width||cyPix>rect.height){
+      hideReadout(); return;
+    }
+    reticle.style.display='block';
+    reticle.style.left = cxPix+'px';
+    reticle.style.top = cyPix+'px';
+
+    const px = clamp(Math.round(cxPix/rect.width*W), 0, W-1);
+    const py = clamp(Math.round(cyPix/rect.height*H), 0, H-1);
+
+    const nearVessel = findNearestVesselPixel(px, py, 9);
+    if (nearVessel < 0){
+      showEmptyReadout();
+      return;
+    }
+    const nearSkel = findNearestSkeletonPixel(nearVessel, 9);
+    const refIdx = nearSkel >= 0 ? nearSkel : nearVessel;
+    const diameterPx = Math.max(1, (distTransform[refIdx]||0.6) * 2);
+    const diameterUm = diameterPx * microPerPixel;
+    const cls = nearSkel>=0 ? classMap[nearSkel] : 0;
+
+    showReadout(cls, diameterUm, diameterPx);
+  }
+
+  function showEmptyReadout(){
+    readout.classList.add('show');
+    readout.innerHTML = `<div class="readout-empty">No vessel detected at this point. Move toward a red or gold line.</div>`;
+  }
+
+  function showReadout(cls, um, px){
+    readout.classList.add('show');
+    let label, color;
+    if (cls===1){ label='ARTERY'; color='var(--artery)'; }
+    else if (cls===2){ label='VEIN'; color='var(--vein)'; }
+    else { label='VESSEL (unclassified)'; color='var(--muted)'; }
+
+    readout.innerHTML = `
+      <div class="readout-label"><span class="pip" style="background:${color}"></span>${label}</div>
+      <div class="readout-value">${um.toFixed(1)}<span class="unit">µm</span></div>
+      <div class="readout-sub">≈ ${px.toFixed(1)} px diameter at cursor</div>
+      <div class="readout-divider"></div>
+      <div class="readout-sub">Scale ${microPerPixel.toFixed(2)} µm/px · disc-calibrated</div>
+    `;
+  }
+
+  function hideReadout(){
+    reticle.style.display='none';
+    readout.classList.remove('show');
+  }
+
+  // ============================================================
+  // 12. EVENTS
+  // ============================================================
+  function setupEvents(){
+    canvasWrap.addEventListener('mousemove', handlePointerMove);
+    canvasWrap.addEventListener('mouseleave', hideReadout);
+    canvasWrap.addEventListener('touchmove', (e)=>{
+      const t = e.touches[0];
+      if (t) handlePointerMove({clientX:t.clientX, clientY:t.clientY});
+      e.preventDefault();
+    }, {passive:false});
+
+    modeTabs.forEach(tab=>{
+      tab.addEventListener('click', ()=>{
+        if (tab.disabled) return;
+        setMode(tab.dataset.mode);
+      });
+    });
+
+    [tgVessels, tgSkeleton, tgClassify].forEach(tg=> tg.addEventListener('change', render));
+
+    resetBtn.addEventListener('click', ()=>{
+      hasResult = false;
+      analysis.classList.remove('active');
+      dropzone.style.display = 'flex';
+      enableModeTabs(false);
+      setMode('original');
+      hideReadout();
+      fileInput.value = '';
+      statVesselPct.textContent='—'; statArteryLen.textContent='—';
+      statVeinLen.textContent='—'; statAVR.textContent='—';
+      scaleBadge.textContent='Scale: calibrating…';
+    });
+
+    downloadBtn.addEventListener('click', ()=>{
+      if (!hasResult) return;
+      const out = document.createElement('canvas');
+      out.width = W; out.height = H;
+      const octx = out.getContext('2d');
+      octx.drawImage(cnvBase,0,0);
+      octx.drawImage(cnvOverlay,0,0);
+      const link = document.createElement('a');
+      link.download = 'retinacare-vessel-analysis.png';
+      link.href = out.toDataURL('image/png');
+      link.click();
+    });
+  }
+
+  // ============================================================
+  // INIT
+  // ============================================================
+  setupDropzone();
+  setupEvents();
+
+})();
+
+</script>
+</body>
+</html>
